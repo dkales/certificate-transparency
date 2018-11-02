@@ -4,8 +4,10 @@
 #include <stddef.h>
 #include <string>
 #include <vector>
+#include <dpf_pir/hashdatastore.h>
 
 #include "merkletree/merkle_tree_math.h"
+#include "dpf_pir/dpf.h"
 
 using cert_trans::MerkleTreeInterface;
 using std::move;
@@ -250,15 +252,26 @@ std::vector<string> MerkleTree::PathFromNodeToRootAtSnapshot(size_t node,
   return path;
 }
 
-string MerkleTree::Node(size_t level, size_t index) const {
+std::string MerkleTree::Node(size_t level, size_t index) const {
   assert(NodeCount(level) > index);
-  return tree_[level].substr(index * treehasher_.DigestSize(),
-                             treehasher_.DigestSize());
+  String ref = tree_[level].substr(index * treehasher_.DigestSize(), treehasher_.DigestSize());
+  return std::string(ref.begin(), ref.end());
+}
+
+string MerkleTree::NodeDPF(size_t level, const std::vector<uint8_t>& DPF_key) {
+  //set hashdatastore to leveldb.data()
+  //evaluate DPF & answer query
+  std::vector<uint8_t> DPF_keystream = DPF::EvalFull8(DPF_key, tree_.size() - level);
+  MerkleTree::String& leveldata = tree_[level];
+  span<hashdatastore::hash_type> leveldb(reinterpret_cast<hashdatastore::hash_type*>(&leveldata[0]), leveldata.size() / sizeof(hashdatastore::hash_type));
+  hashdatastore store(leveldb);
+  hashdatastore::hash_type answer = store.answer_pir2(DPF_keystream);
+  return std::string((reinterpret_cast<char*>(&answer)), reinterpret_cast<char*>(&answer) + sizeof(hashdatastore::hash_type));
 }
 
 string MerkleTree::Root() const {
   assert(tree_.back().size() == treehasher_.DigestSize());
-  return tree_.back();
+  return std::string(tree_.back().begin(), tree_.back().end());
 }
 
 size_t MerkleTree::NodeCount(size_t level) const {
@@ -268,7 +281,8 @@ size_t MerkleTree::NodeCount(size_t level) const {
 
 string MerkleTree::LastNode(size_t level) const {
   assert(NodeCount(level) >= 1U);
-  return tree_[level].substr(tree_[level].size() - treehasher_.DigestSize());
+  MerkleTree::String tmp = tree_[level].substr(tree_[level].size() - treehasher_.DigestSize());
+  return std::string(tmp.begin(), tmp.end());
 }
 
 void MerkleTree::PopBack(size_t level) {
@@ -279,11 +293,11 @@ void MerkleTree::PopBack(size_t level) {
 void MerkleTree::PushBack(size_t level, string node) {
   assert(node.size() == treehasher_.DigestSize());
   assert(LazyLevelCount() > level);
-  tree_[level].append(node);
+  tree_[level].append(node.begin(), node.end());
 }
 
 void MerkleTree::AddLevel() {
-  tree_.push_back(string());
+  tree_.push_back(MerkleTree::String());
 }
 
 size_t MerkleTree::LazyLevelCount() const {
@@ -304,7 +318,7 @@ bool MutableMerkleTree::UpdateLeafHash(size_t leaf, const string& hash) {
   // Update the leaf node.
   size_t child = leaf - 1;
   tree_[0].replace(treehasher_.DigestSize() * child, treehasher_.DigestSize(),
-                   hash);
+                   MerkleTree::String(hash.begin(), hash.end()));
 
   if (leaf > leaves_processed_)
     return true;
@@ -326,7 +340,7 @@ bool MutableMerkleTree::UpdateLeafHash(size_t leaf, const string& hash) {
     }
 
     tree_[child_level + 1].replace(treehasher_.DigestSize() * parent,
-                                   treehasher_.DigestSize(), parent_hash);
+                                   treehasher_.DigestSize(), MerkleTree::String(parent_hash.begin(), parent_hash.end()));
 
     child = parent;
     parent = MerkleTreeMath::Parent(parent);

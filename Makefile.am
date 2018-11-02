@@ -8,7 +8,7 @@ AM_CPPFLAGS = \
 	$(json_c_CFLAGS)
 
 AM_CXXFLAGS = \
-	-fno-exceptions
+	-fno-exceptions -maes -msse4.1 -mavx2
 
 BUILT_SOURCES = \
 	cpp/gmock-all.cc \
@@ -212,7 +212,13 @@ cpp_libcore_a_SOURCES = \
 	cpp/util/uuid.cc \
 	cpp/version.cc \
 	proto/ct.pb.cc \
-	proto/ct.pb.h
+	proto/ct.pb.h \
+	cpp/dpf_pir/dpf.cpp \
+	cpp/dpf_pir/hashdatastore.cpp \
+	cpp/dpf_pir/AES.cpp \
+	cpp/dpf_pir/PRNG.cpp \
+	cpp/dpf_pir/Defines.cpp \
+	cpp/dpf_pir/Log.cpp
 
 if !OPENSSL_IS_BORINGSSL
 cpp_libcore_a_SOURCES += cpp/log/cms_verifier.cc

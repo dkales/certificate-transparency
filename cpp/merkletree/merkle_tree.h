@@ -8,6 +8,7 @@
 
 #include "merkletree/merkle_tree_interface.h"
 #include "merkletree/tree_hasher.h"
+#include "dpf_pir/alignment_allocator.h"
 
 class SerialHasher;
 
@@ -147,6 +148,8 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // caller is responsible for ensuring tree is sufficiently up to date.
   std::string Node(size_t level, size_t index) const;
 
+  std::string NodeDPF(size_t level, const std::vector<uint8_t>& DPFkey);
+
   // Get the current root (of the lazily evaluated tree).
   // Caller is responsible for keeping track of the lazy evaluation status.
   std::string Root() const;
@@ -200,7 +203,8 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // Since the tree is append-only from the right, at any given point in time,
   // at each level, all nodes computed so far, except possibly the last node,
   // are fixed and will no longer change.
-  std::vector<std::string> tree_;
+  typedef std::basic_string<char, std::char_traits<char>, AlignmentAllocator<char, 32>> String;
+  std::vector<String> tree_;
   TreeHasher treehasher_;
   // Number of leaves propagated up to the root,
   // to keep track of lazy evaluation.

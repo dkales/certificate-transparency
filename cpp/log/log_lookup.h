@@ -42,6 +42,10 @@ class LogLookup {
   LookupResult AuditProof(int64_t index, size_t tree_size,
                           ct::ShortMerkleAuditProof* proof);
 
+  // Look up by index of the logged item and tree_size.
+  LookupResult AuditProofDPF(std::vector<std::vector<uint8_t> > DPF_keys, size_t tree_size,
+                          ct::ShortMerkleAuditProof* proof);
+
   // Look up by hash of the logged item and tree_size.
   LookupResult AuditProof(const std::string& merkle_leaf_hash,
                           size_t tree_size, ct::ShortMerkleAuditProof* proof);
