@@ -8,7 +8,7 @@ AM_CPPFLAGS = \
 	$(json_c_CFLAGS)
 
 AM_CXXFLAGS = \
-	-fno-exceptions -maes -msse4.1 -mavx2
+	-fno-exceptions -maes -msse4.1 -mavx2 -g
 
 BUILT_SOURCES = \
 	cpp/gmock-all.cc \

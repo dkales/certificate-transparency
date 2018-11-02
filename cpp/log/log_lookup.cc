@@ -171,18 +171,24 @@ LogLookup::LookupResult LogLookup::AuditProof(int64_t leaf_index,
   return OK;
 }
 
-LogLookup::LookupResult LogLookup::AuditProofDPF(std::vector<std::vector<uint8_t> > DPF_keys, size_t tree_size,
-                           ct::ShortMerkleAuditProof* proof) {
-  lock_guard<mutex> lock(lock_);
+LogLookup::LookupResult LogLookup::AuditProofDPF(const std::vector<std::vector<uint8_t> >& DPF_keys, size_t tree_size,
+                           ct::MerkleAuditProof* proof) {
+  unique_lock<mutex> lock(lock_);
 
-  proof->set_leaf_index(0);
+  proof->set_version(ct::V1);
+  proof->set_tree_size(cert_tree_.LeafCount());
+  proof->set_timestamp(latest_tree_head_.timestamp());
+  proof->set_leaf_index(-1);
 
   proof->clear_path_node();
   vector<string> audit_path =
-          cert_tree_.PathToRootAtSnapshot(1, tree_size);
+          cert_tree_.PathToRootAtSnapshotDPF(DPF_keys, tree_size);
   for (size_t i = 0; i < audit_path.size(); ++i)
     proof->add_path_node(audit_path[i]);
 
+  proof->mutable_id()->CopyFrom(latest_tree_head_.id());
+  proof->mutable_tree_head_signature()->CopyFrom(
+          latest_tree_head_.signature());
   return OK;
 }
 

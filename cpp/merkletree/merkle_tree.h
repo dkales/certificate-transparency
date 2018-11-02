@@ -121,6 +121,11 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // @param snapshot point in time (= number of leaves at that point)
   std::vector<std::string> PathToRootAtSnapshot(size_t leaf, size_t snapshot);
 
+  // Path from a leaf node to the root at a given snapshot.
+  // via DPF
+  std::vector<std::string> PathToRootAtSnapshotDPF(const std::vector<std::vector<uint8_t>>& DPF_keys,
+                                                     size_t snapshot);
+
   // Get the Merkle consistency proof between two snapshots.
   // Returns a vector of node hashes, ordered according to levels.
   // Returns an empty vector if snapshot1 is 0, snapshot 1 >= snapshot2,

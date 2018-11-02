@@ -1,5 +1,6 @@
 #include "merkletree/merkle_tree.h"
 
+#include <iostream>
 #include <assert.h>
 #include <stddef.h>
 #include <string>
@@ -72,6 +73,31 @@ std::vector<string> MerkleTree::PathToRootAtSnapshot(size_t leaf,
   if (leaf > snapshot || snapshot > leaf_count || leaf == 0)
     return path;
   return PathFromNodeToRootAtSnapshot(leaf - 1, 0, snapshot);
+}
+
+std::vector<string> MerkleTree::PathToRootAtSnapshotDPF(const std::vector<std::vector<uint8_t>>& DPF_keys,
+                                                     size_t snapshot) {
+  std::vector<string> path;
+  size_t leaf_count = LeafCount();
+  if (snapshot > leaf_count)
+    return path;
+  if (snapshot == 0)
+    return path;
+  // Index of the last node.
+  size_t level = 0;
+  if (level >= level_count_ || snapshot > LeafCount())
+    return path;
+
+  if (snapshot > leaves_processed_) {
+    // Bring the tree sufficiently up to date.
+    UpdateToSnapshot(snapshot);
+  }
+
+  for(; level < level_count_; level++) {
+    path.push_back(NodeDPF(level, DPF_keys[level]));
+  }
+
+  return path;
 }
 
 std::vector<string> MerkleTree::SnapshotConsistency(size_t snapshot1,
@@ -261,8 +287,15 @@ std::string MerkleTree::Node(size_t level, size_t index) const {
 string MerkleTree::NodeDPF(size_t level, const std::vector<uint8_t>& DPF_key) {
   //set hashdatastore to leveldb.data()
   //evaluate DPF & answer query
-  std::vector<uint8_t> DPF_keystream = DPF::EvalFull8(DPF_key, tree_.size() - level);
+  std::vector<uint8_t> DPF_keystream;
+  size_t level_size = level_count_ - level - 1;
+  if(level_size <= 10) {
+    DPF_keystream = DPF::EvalFull(DPF_key, level_size);
+  } else {
+    DPF_keystream = DPF::EvalFull8(DPF_key, level_size);
+  }
   MerkleTree::String& leveldata = tree_[level];
+  std::cout << level_size << "," << DPF_keystream.size() << "," << leveldata.size() << std::endl;
   span<hashdatastore::hash_type> leveldb(reinterpret_cast<hashdatastore::hash_type*>(&leveldata[0]), leveldata.size() / sizeof(hashdatastore::hash_type));
   hashdatastore store(leveldb);
   hashdatastore::hash_type answer = store.answer_pir2(DPF_keystream);

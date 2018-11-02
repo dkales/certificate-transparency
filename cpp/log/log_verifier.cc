@@ -74,15 +74,15 @@ LogVerifier::LogVerifyResult LogVerifier::VerifySignedTreeHead(
 }
 
 LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProof(
-    const LogEntry& entry, const SignedCertificateTimestamp& sct,
-    const MerkleAuditProof& merkle_proof) const {
+        const LogEntry& entry, const SignedCertificateTimestamp& sct,
+        const MerkleAuditProof& merkle_proof) const {
   if (!IsBetween(merkle_proof.timestamp(), sct.timestamp(),
                  util::TimeInMilliseconds() + 1000))
     return INCONSISTENT_TIMESTAMPS;
 
   string serialized_leaf;
   SerializeResult serialize_result =
-      Serializer::SerializeSCTMerkleTreeLeaf(sct, entry, &serialized_leaf);
+          Serializer::SerializeSCTMerkleTreeLeaf(sct, entry, &serialized_leaf);
 
   if (serialize_result != SerializeResult::OK)
     return INVALID_FORMAT;
@@ -94,9 +94,9 @@ LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProof(
 
   // Leaf indexing in the MerkleTree starts from 1.
   string root_hash =
-      merkle_verifier_->RootFromPath(merkle_proof.leaf_index() + 1,
-                                     merkle_proof.tree_size(), path,
-                                     serialized_leaf);
+          merkle_verifier_->RootFromPath(merkle_proof.leaf_index() + 1,
+                                         merkle_proof.tree_size(), path,
+                                         serialized_leaf);
 
   if (root_hash.empty())
     return INVALID_MERKLE_PATH;
@@ -108,6 +108,70 @@ LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProof(
   sth.set_tree_size(merkle_proof.tree_size());
   sth.set_sha256_root_hash(root_hash);
   sth.mutable_signature()->CopyFrom(merkle_proof.tree_head_signature());
+
+  if (sig_verifier_->VerifySTHSignature(sth) != LogSigVerifier::OK)
+    return INVALID_SIGNATURE;
+  return VERIFY_OK;
+}
+
+LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProofDPF(
+    const LogEntry& entry, const SignedCertificateTimestamp& sct,
+    const MerkleAuditProof& merkle_proof1, const MerkleAuditProof& merkle_proof2) const {
+  if (!IsBetween(merkle_proof1.timestamp(), sct.timestamp(),
+                 util::TimeInMilliseconds() + 1000))
+    return INCONSISTENT_TIMESTAMPS;
+  if (!IsBetween(merkle_proof2.timestamp(), sct.timestamp(),
+                 util::TimeInMilliseconds() + 1000))
+    return INCONSISTENT_TIMESTAMPS;
+
+  string serialized_leaf;
+  SerializeResult serialize_result =
+      Serializer::SerializeSCTMerkleTreeLeaf(sct, entry, &serialized_leaf);
+
+  if (serialize_result != SerializeResult::OK)
+    return INVALID_FORMAT;
+
+  if (merkle_proof1.path_node_size() != merkle_proof2.path_node_size())
+    return INVALID_FORMAT;
+
+  std::vector<string> path;
+  path.reserve(merkle_proof1.path_node_size());
+  for (int i = 0; i < merkle_proof1.path_node_size(); ++i) {
+    string xord = "";
+    string a = merkle_proof1.path_node(i);
+    string b = merkle_proof2.path_node(i);
+    for(int j = 0; j < a.size(); j++) {
+      xord.push_back(a[j]^b[j]);
+    }
+    path.push_back(xord);
+  }
+
+  // Leaf indexing in the MerkleTree starts from 1.
+  string root_hash =
+      merkle_verifier_->RootFromPath(merkle_proof1.leaf_index() + 1,
+                                     merkle_proof1.tree_size(), path,
+                                     serialized_leaf);
+
+  if (root_hash.empty())
+    return INVALID_MERKLE_PATH;
+
+  SignedTreeHead sth;
+  sth.set_version(merkle_proof1.version());
+  sth.mutable_id()->CopyFrom(merkle_proof1.id());
+  sth.set_timestamp(merkle_proof1.timestamp());
+  sth.set_tree_size(merkle_proof1.tree_size());
+  sth.set_sha256_root_hash(root_hash);
+  sth.mutable_signature()->CopyFrom(merkle_proof1.tree_head_signature());
+
+  if (sig_verifier_->VerifySTHSignature(sth) != LogSigVerifier::OK)
+    return INVALID_SIGNATURE;
+  sth.Clear();
+  sth.set_version(merkle_proof2.version());
+  sth.mutable_id()->CopyFrom(merkle_proof2.id());
+  sth.set_timestamp(merkle_proof2.timestamp());
+  sth.set_tree_size(merkle_proof2.tree_size());
+  sth.set_sha256_root_hash(root_hash);
+  sth.mutable_signature()->CopyFrom(merkle_proof2.tree_head_signature());
 
   if (sig_verifier_->VerifySTHSignature(sth) != LogSigVerifier::OK)
     return INVALID_SIGNATURE;

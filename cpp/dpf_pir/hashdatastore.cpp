@@ -313,8 +313,9 @@ hashdatastore::hash_type hashdatastore::answer_pir2(const std::vector<uint8_t> &
             {result},
             {result},
             {result}, };
-    assert(data_.size() % 8 == 0);
-    for(size_t i = 0; i < data_.size(); i+=8) {
+
+    size_t end_8 = (data_.size()/8) * 8;
+    for(size_t i = 0; i < end_8; i+=8) {
         uint64_t tmp = indexing[i/8];
         results[0] = _mm256_xor_si256(results[0], _mm256_and_si256(data_[i+0], _mm256_set1_epi64x(-((tmp>>0)&1))));
         results[1] = _mm256_xor_si256(results[1], _mm256_and_si256(data_[i+1], _mm256_set1_epi64x(-((tmp>>1)&1))));
@@ -324,6 +325,10 @@ hashdatastore::hash_type hashdatastore::answer_pir2(const std::vector<uint8_t> &
         results[5] = _mm256_xor_si256(results[5], _mm256_and_si256(data_[i+5], _mm256_set1_epi64x(-((tmp>>5)&1))));
         results[6] = _mm256_xor_si256(results[6], _mm256_and_si256(data_[i+6], _mm256_set1_epi64x(-((tmp>>6)&1))));
         results[7] = _mm256_xor_si256(results[7], _mm256_and_si256(data_[i+7], _mm256_set1_epi64x(-((tmp>>7)&1))));
+    }
+    for(size_t i = end_8;  i < data_.size(); i++) {
+        uint64_t tmp = indexing[i/8];
+        results[i%8] = _mm256_xor_si256(results[i%8], _mm256_and_si256(data_[i], _mm256_set1_epi64x(-((tmp>>(i%8))&1))));
     }
 
     result = _mm256_xor_si256(results[0], results[1]);

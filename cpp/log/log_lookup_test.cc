@@ -23,6 +23,7 @@
 #include "util/testing.h"
 #include "util/thread_pool.h"
 #include "util/util.h"
+#include "dpf_pir/dpf.h"
 
 namespace {
 
@@ -226,6 +227,39 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
                                                      logged_certs[i].sct(),
                                                      proof));
   }
+}
+
+TYPED_TEST(LogLookupTest, VerifyWithPathDPF) {
+    LoggedEntry logged_certs[13];
+
+    // Make the tree not balanced for extra fun.
+    for (int i = 0; i < 13; ++i) {
+        this->test_signer_.CreateUnique(&logged_certs[i]);
+        this->CreateSequencedEntry(&logged_certs[i], i);
+    }
+
+    this->UpdateTree();
+
+    LogLookup lookup(this->db());
+    MerkleAuditProof proof1;
+    MerkleAuditProof proof2;
+
+    for (int i = 0; i < 13; ++i) {
+        //pack into generate functionality
+        auto k4 =  DPF::Gen(i, 4);
+        auto k3 =  DPF::Gen(i/2, 3);
+        auto k2 =  DPF::Gen(i/4, 2);
+        auto k1 =  DPF::Gen(i/8, 1);
+        auto k0 =  DPF::Gen(i/16, 0);
+        std::vector<std::vector<uint8_t>> key0 = {k4.first,k3.first,k2.first,k1.first,k0.first};
+        std::vector<std::vector<uint8_t>> key1 = {k4.second,k3.second,k2.second,k1.second,k0.second};
+        EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key0, 13, &proof1));
+        EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key1, 13, &proof2));
+        EXPECT_EQ(LogVerifier::VERIFY_OK,
+            this->verifier_.VerifyMerkleAuditProofDPF(logged_certs[i].entry(),
+            logged_certs[i].sct(), proof1, proof2)
+        );
+    }
 }
 
 

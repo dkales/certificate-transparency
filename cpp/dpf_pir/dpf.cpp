@@ -241,7 +241,8 @@ namespace DPF {
     std::vector<uint8_t> EvalFull(const std::vector<uint8_t>& key, size_t logn) {
         assert(logn <= 63);
         std::vector<uint8_t> data;
-        data.reserve(1ULL << (logn-3));
+        if(logn >=3)
+            data.reserve(1ULL << (logn-3));
         block s;
         memcpy(&s, key.data(), 16);
         uint8_t t = key.data()[16];

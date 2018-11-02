@@ -108,6 +108,10 @@ class LogVerifier {
       const ct::LogEntry& entry, const ct::SignedCertificateTimestamp& sct,
       const ct::MerkleAuditProof& merkle_proof) const;
 
+  LogVerifyResult VerifyMerkleAuditProofDPF(
+      const ct::LogEntry& entry, const ct::SignedCertificateTimestamp& sct,
+      const ct::MerkleAuditProof& merkle_proof1, const ct::MerkleAuditProof& merkle_proof2) const;
+
   bool VerifyConsistency(const ct::SignedTreeHead& sth1,
                          const ct::SignedTreeHead& sth2,
                          const std::vector<std::string>& proof) const;
