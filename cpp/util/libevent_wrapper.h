@@ -31,6 +31,7 @@ class Base : public util::Executor {
   class Resolver {
    public:
     virtual std::string Resolve(const std::string& host) = 0;
+    virtual ~Resolver() = default;
   };
 
   static bool OnEventThread();

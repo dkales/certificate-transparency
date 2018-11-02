@@ -48,6 +48,7 @@ class EntryHandleBase {
   }
 
   virtual bool SerializeToString(std::string* output) const = 0;
+  virtual ~EntryHandleBase() = default;
 
  protected:
   EntryHandleBase(int handle) : has_handle_(true), handle_(handle) {
@@ -71,6 +72,7 @@ class EntryHandle : public EntryHandleBase {
  public:
   EntryHandle() : entry_() {
   }
+  virtual ~EntryHandle() = default;
 
   const T& Entry() const {
     return entry_;
