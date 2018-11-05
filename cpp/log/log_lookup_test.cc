@@ -230,10 +230,10 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
 }
 
 TYPED_TEST(LogLookupTest, VerifyWithPathDPF) {
-    LoggedEntry logged_certs[13];
+    LoggedEntry logged_certs[16];
 
-    // Make the tree not balanced for extra fun.
-    for (int i = 0; i < 13; ++i) {
+    // Make the tree balanced at first
+    for (int i = 0; i < 16; ++i) {
         this->test_signer_.CreateUnique(&logged_certs[i]);
         this->CreateSequencedEntry(&logged_certs[i], i);
     }
@@ -244,17 +244,15 @@ TYPED_TEST(LogLookupTest, VerifyWithPathDPF) {
     MerkleAuditProof proof1;
     MerkleAuditProof proof2;
 
-    for (int i = 0; i < 13; ++i) {
+    for (int i = 0; i < 16; ++i) {
         //pack into generate functionality
-        auto k4 =  DPF::Gen(i, 4);
-        auto k3 =  DPF::Gen(i/2, 3);
-        auto k2 =  DPF::Gen(i/4, 2);
-        auto k1 =  DPF::Gen(i/8, 1);
-        auto k0 =  DPF::Gen(i/16, 0);
-        std::vector<std::vector<uint8_t>> key0 = {k4.first,k3.first,k2.first,k1.first,k0.first};
-        std::vector<std::vector<uint8_t>> key1 = {k4.second,k3.second,k2.second,k1.second,k0.second};
-        EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key0, 13, &proof1));
-        EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key1, 13, &proof2));
+        std::vector<std::vector<uint8_t>> key0;
+        std::vector<std::vector<uint8_t>> key1;
+        lookup.GenDPF(key0, key1, 4, i);
+        EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key0, 16, &proof1));
+        EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key1, 16, &proof2));
+        proof1.set_leaf_index(i);
+        proof2.set_leaf_index(i);
         EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_.VerifyMerkleAuditProofDPF(logged_certs[i].entry(),
             logged_certs[i].sct(), proof1, proof2)

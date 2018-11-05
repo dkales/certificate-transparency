@@ -93,7 +93,7 @@ std::vector<string> MerkleTree::PathToRootAtSnapshotDPF(const std::vector<std::v
     UpdateToSnapshot(snapshot);
   }
 
-  for(; level < level_count_; level++) {
+  for(; level < level_count_ - 1; level++) {
     path.push_back(NodeDPF(level, DPF_keys[level]));
   }
 
@@ -295,7 +295,7 @@ string MerkleTree::NodeDPF(size_t level, const std::vector<uint8_t>& DPF_key) {
     DPF_keystream = DPF::EvalFull8(DPF_key, level_size);
   }
   MerkleTree::String& leveldata = tree_[level];
-  std::cout << level_size << "," << DPF_keystream.size() << "," << leveldata.size() << std::endl;
+//  std::cout << level_size << "," << DPF_keystream.size() << "," << leveldata.size() << std::endl;
   span<hashdatastore::hash_type> leveldb(reinterpret_cast<hashdatastore::hash_type*>(&leveldata[0]), leveldata.size() / sizeof(hashdatastore::hash_type));
   hashdatastore store(leveldb);
   hashdatastore::hash_type answer = store.answer_pir2(DPF_keystream);

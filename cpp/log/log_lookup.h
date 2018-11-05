@@ -42,6 +42,10 @@ class LogLookup {
   LookupResult AuditProof(int64_t index, size_t tree_size,
                           ct::ShortMerkleAuditProof* proof);
 
+  // Generate DPF keys for lookup
+  void GenDPF(std::vector<std::vector<uint8_t> >& DPF_keys_a, std::vector<std::vector<uint8_t> >& DPF_keys_b,
+          size_t tree_size, size_t index);
+
   // Look up by index of the logged item and tree_size.
   LookupResult AuditProofDPF(const std::vector<std::vector<uint8_t> >& DPF_keys, size_t tree_size,
                           ct::MerkleAuditProof* proof);

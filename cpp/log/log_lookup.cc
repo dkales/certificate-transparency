@@ -7,10 +7,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <dpf_pir/dpf.h>
 
 #include "base/time_support.h"
 #include "merkletree/merkle_tree.h"
 #include "merkletree/serial_hasher.h"
+#include "merkletree/merkle_tree_math.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/util.h"
@@ -169,6 +171,23 @@ LogLookup::LookupResult LogLookup::AuditProof(int64_t leaf_index,
     proof->add_path_node(audit_path[i]);
 
   return OK;
+}
+void LogLookup::GenDPF(std::vector<std::vector<uint8_t> >& DPF_keys_a, std::vector<std::vector<uint8_t> >& DPF_keys_b,
+                size_t tree_size, size_t index) {
+
+  if (tree_size == 0)
+    return;
+
+  // Move up, recording the sibling of the current node at each level.
+  while (tree_size) {
+    size_t sibling = MerkleTreeMath::Sibling(index);
+    auto keys = DPF::Gen(sibling, tree_size);
+    DPF_keys_a.push_back(keys.first);
+    DPF_keys_b.push_back(keys.second);
+
+    index = MerkleTreeMath::Parent(index);
+    --tree_size;
+  }
 }
 
 LogLookup::LookupResult LogLookup::AuditProofDPF(const std::vector<std::vector<uint8_t> >& DPF_keys, size_t tree_size,
