@@ -33,6 +33,7 @@ using cert_trans::LoggedEntry;
 using cert_trans::Proxy;
 using cert_trans::ScopedLatency;
 using ct::ShortMerkleAuditProof;
+using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::bind;
@@ -151,6 +152,8 @@ void HttpHandler::Add(libevent::HttpServer* server) {
                          bind(&HttpHandler::GetEntries, this, _1));
   AddProxyWrappedHandler(server, "/ct/v1/get-proof-by-hash",
                          bind(&HttpHandler::GetProof, this, _1));
+  AddProxyWrappedHandler(server, "/ct/v1/get-proof-dpf",
+                         bind(&HttpHandler::GetProofDPF, this, _1));
   AddProxyWrappedHandler(server, "/ct/v1/get-sth",
                          bind(&HttpHandler::GetSTH, this, _1));
   AddProxyWrappedHandler(server, "/ct/v1/get-sth-consistency",
@@ -228,6 +231,79 @@ void HttpHandler::GetProof(evhttp_request* req) const {
 
   ShortMerkleAuditProof proof;
   if (log_lookup_->AuditProof(hash, tree_size, &proof) != LogLookup::OK) {
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Couldn't find hash.");
+  }
+
+  JsonArray json_audit;
+  for (int i = 0; i < proof.path_node_size(); ++i) {
+    json_audit.AddBase64(proof.path_node(i));
+  }
+
+  JsonObject json_reply;
+  json_reply.Add("leaf_index", proof.leaf_index());
+  json_reply.Add("audit_path", json_audit);
+
+  SendJsonReply(event_base_, req, HTTP_OK, json_reply);
+}
+
+void HttpHandler::GetProofDPF(evhttp_request* req) const {
+  if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
+    return SendJsonError(event_base_, req, HTTP_BADMETHOD,
+                         "Method not allowed.");
+  }
+
+  const libevent::QueryParams query(libevent::ParseQuery(req));
+
+  string b64_dpfkeys;
+  if (!libevent::GetParam(query, "dpfkeys", &b64_dpfkeys)) {
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"dpfkeys\" parameter.");
+  }
+  if(b64_dpfkeys.empty()){
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Invalid \"dpfkeys\" parameter.");
+  }
+  std::vector<std::vector<uint8_t>> DPF_keys;
+  const string delim = ";";
+  auto start = 0U;
+  auto end = b64_dpfkeys.find(delim);
+  while (end != std::string::npos)
+  {
+    std::vector<uint8_t> dpf_key;
+    string tmp = util::FromBase64(b64_dpfkeys.substr(start, end - start).c_str());
+    if(tmp.empty()){
+      return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                             "Invalid \"dpfkeys\" parameter.");
+    }
+    for(uint8_t byte : tmp) {
+      dpf_key.push_back(byte);
+    }
+
+    start = end + delim.length();
+    end = b64_dpfkeys.find(delim, start);
+    DPF_keys.push_back(dpf_key);
+  }
+  std::vector<uint8_t> dpf_key;
+  string tmp = util::FromBase64(b64_dpfkeys.substr(start, end).c_str());
+  if(tmp.empty()){
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Invalid \"dpfkeys\" parameter.");
+  }
+  for(uint8_t byte : tmp) {
+    dpf_key.push_back(byte);
+  }
+  DPF_keys.push_back(dpf_key);
+
+  const int64_t tree_size(libevent::GetIntParam(query, "tree_size"));
+  if (tree_size < 0 ||
+      static_cast<int64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"tree_size\" parameter.");
+  }
+
+  MerkleAuditProof proof;
+  if (log_lookup_->AuditProofDPF(DPF_keys, tree_size, &proof) != LogLookup::OK) {
     return SendJsonError(event_base_, req, HTTP_BADREQUEST,
                          "Couldn't find hash.");
   }

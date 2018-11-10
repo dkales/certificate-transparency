@@ -2,6 +2,7 @@
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <iostream>
 #include <chrono>
 #include <unordered_map>
 #include <vector>

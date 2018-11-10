@@ -137,6 +137,30 @@ StatusOr<MerkleAuditProof> HTTPLogClient::QueryAuditProof(
   return Status::UNKNOWN;
 }
 
+StatusOr<MerkleAuditProof> HTTPLogClient::QueryAuditProofDPF(
+        const std::vector<std::vector<uint8_t>>& dpf_keys) {
+  const StatusOr<SignedTreeHead> sth(GetSTH());
+  if (!sth.status().ok()) {
+    return sth.status();
+  }
+
+  MerkleAuditProof proof;
+  AsyncLogClient::Status status(AsyncLogClient::UNKNOWN_ERROR);
+  bool done(false);
+  client_.QueryInclusionProofDPF(sth.ValueOrDie(), dpf_keys, &proof,
+                              bind(&DoneRequest, _1, &status, &done));
+
+  while (!done) {
+    base_->DispatchOnce();
+  }
+
+  if (status == AsyncLogClient::OK) {
+    return proof;
+  }
+
+  return Status::UNKNOWN;
+}
+
 StatusOr<vector<AsyncLogClient::Entry>> HTTPLogClient::GetEntries(int first,
                                                                   int last) {
   vector<AsyncLogClient::Entry> entries;

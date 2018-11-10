@@ -457,6 +457,23 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
                                             executor_));
 }
 
+void AsyncLogClient::QueryInclusionProofDPF(const SignedTreeHead& sth,
+                                         const std::vector<std::vector<uint8_t> >& dpf_keys,
+                                         MerkleAuditProof* proof,
+                                         const Callback& done) {
+  CHECK_GE(sth.tree_size(), 0);
+
+  URL url(GetURL("get-proof-dpf"));
+  // encode the dpf keys into base64
+  url.SetQuery("dpfkeys=" + UriEncode(util::ToBase64("asdf")) +
+               "&tree_size=" + to_string(sth.tree_size()));
+
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Fetch(url, resp, new util::Task(bind(DoneQueryInclusionProof, resp,
+                                                 sth, proof, done, _1),
+                                            executor_));
+}
+
 
 void AsyncLogClient::GetSTHConsistency(int64_t first, int64_t second,
                                        vector<string>* proof,

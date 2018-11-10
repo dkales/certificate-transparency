@@ -77,6 +77,10 @@ class AsyncLogClient {
                            const std::string& merkle_leaf_hash,
                            ct::MerkleAuditProof* proof, const Callback& done);
 
+  void QueryInclusionProofDPF(const ct::SignedTreeHead& sth,
+                             const std::vector<std::vector<uint8_t>>& dpf_keys,
+                             ct::MerkleAuditProof* proof, const Callback& done);
+
   // This does not clear "proof" before appending to it.
   void GetSTHConsistency(int64_t first, int64_t second,
                          std::vector<std::string>* proof,

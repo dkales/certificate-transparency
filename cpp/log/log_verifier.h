@@ -3,6 +3,7 @@
 
 #include <glog/logging.h>
 #include <stdint.h>
+#include <vector>
 
 #include "log/log_signer.h"
 #include "proto/ct.pb.h"
@@ -107,6 +108,10 @@ class LogVerifier {
   LogVerifyResult VerifyMerkleAuditProof(
       const ct::LogEntry& entry, const ct::SignedCertificateTimestamp& sct,
       const ct::MerkleAuditProof& merkle_proof) const;
+
+  // Generate DPF keys for lookup
+  void GenDPF(std::vector<std::vector<uint8_t> >& DPF_keys_a, std::vector<std::vector<uint8_t> >& DPF_keys_b,
+                size_t tree_size, size_t index);
 
   LogVerifyResult VerifyMerkleAuditProofDPF(
       const ct::LogEntry& entry, const ct::SignedCertificateTimestamp& sct,

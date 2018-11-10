@@ -47,6 +47,7 @@ DEFINE_string(ct_server_submission, "",
               "Certificate chain to submit to a CT log server. "
               "The file must consist of concatenated PEM certificates.");
 DEFINE_string(ct_server, "", "CT log server to connect to");
+DEFINE_string(ct_server2, "", "second CT log server to connect to, for DPF");
 DEFINE_string(ct_server_response_out, "",
               "Output file for the Signed Certificate Timestamp received from "
               "the CT log server");
@@ -659,6 +660,99 @@ static AuditResult Audit() {
   return audit_result;
 }
 
+static AuditResult AuditDPF() {
+  string serialized_data;
+  PCHECK(util::ReadBinaryFile(FLAGS_ssl_client_ct_data_in, &serialized_data))
+          << "Could not read CT data from " << FLAGS_ssl_client_ct_data_in;
+  SSLClientCTData ct_data;
+  CHECK(ct_data.ParseFromString(serialized_data))
+          << "Failed to parse the stored certificate CT data";
+  CHECK(ct_data.has_reconstructed_entry());
+  CHECK_GT(ct_data.attached_sct_info_size(), 0);
+
+  LogVerifier* verifier = GetLogVerifierFromFlags();
+  string key_id = verifier->KeyID();
+
+  AuditResult audit_result = PROOF_NOT_FOUND;
+
+  for (int i = 0; i < ct_data.attached_sct_info_size(); ++i) {
+    LOG(INFO) << "Signed Certificate Timestamp number " << i + 1 << ":\n"
+              << ct_data.attached_sct_info(i).sct().DebugString();
+
+    string sct_id = ct_data.attached_sct_info(i).sct().id().key_id();
+    if (sct_id != key_id) {
+      LOG(WARNING) << "Audit skipped: log server Key ID " << sct_id
+                   << " does not match verifier's ID";
+      continue;
+    }
+
+    if(!ct_data.attached_sct_info(i).sct().has_extensions()) {
+      if (sct_id != key_id) {
+        LOG(WARNING) << "Audit skipped: " << sct_id
+                     << " does not have index extension";
+        continue;
+      }
+    }
+    HTTPLogClient client1(FLAGS_ct_server);
+    HTTPLogClient client2(FLAGS_ct_server2);
+    std::vector<std::vector<uint8_t>> DPF_keys1, DPF_keys2;
+    size_t leaf_index;
+    memcpy(&leaf_index, ct_data.attached_sct_info(i).sct().extensions().c_str(), sizeof(leaf_index));
+
+    const StatusOr<SignedTreeHead> sth(client1.GetSTH());
+    if (!sth.status().ok()) {
+      LOG(ERROR) << "QueryAuditProofDPF failed: could not fetch STH";
+      continue;
+    }
+
+    size_t tree_size = sth.ValueOrDie().tree_size();
+    verifier->GenDPF(DPF_keys1, DPF_keys2, tree_size, leaf_index);
+
+    LOG(INFO) << "info = " << ct_data.attached_sct_info(i).DebugString();
+    const StatusOr<MerkleAuditProof> proof_http1(client1.QueryAuditProofDPF(DPF_keys1));
+
+    if (!proof_http1.status().ok()) {
+      LOG(ERROR) << "QueryAuditProof failed: " << proof_http1.status();
+      continue;
+    }
+
+    MerkleAuditProof proof1(proof_http1.ValueOrDie());
+    // HTTP protocol does not supply this.
+    proof1.mutable_id()->set_key_id(sct_id);
+    proof1.set_leaf_index(leaf_index);
+
+    LOG(INFO) << "info = " << ct_data.attached_sct_info(i).DebugString();
+    const StatusOr<MerkleAuditProof> proof_http2(client2.QueryAuditProofDPF(DPF_keys2));
+
+    if (!proof_http2.status().ok()) {
+      LOG(ERROR) << "QueryAuditProof failed: " << proof_http2.status();
+      continue;
+    }
+
+    MerkleAuditProof proof2(proof_http2.ValueOrDie());
+    // HTTP protocol does not supply this.
+    proof2.mutable_id()->set_key_id(sct_id);
+    proof2.set_leaf_index(leaf_index);
+
+    LOG(INFO) << "Received proof:\n" << proof1.DebugString();
+    LOG(INFO) << "Received proof:\n" << proof2.DebugString();
+
+    LogVerifier::LogVerifyResult res =
+            verifier->VerifyMerkleAuditProofDPF(ct_data.reconstructed_entry(),
+                                             ct_data.attached_sct_info(i).sct(),
+                                             proof1, proof2);
+    if (res != LogVerifier::VERIFY_OK) {
+      LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
+      LOG(ERROR) << "Retrieved Merkle proof is invalid.";
+      continue;
+    }
+    LOG(INFO) << "Proof verified.";
+    audit_result = PROOF_OK;
+  }
+  delete verifier;
+  return audit_result;
+}
+
 static int CheckConsistency() {
   HTTPLogClient client(FLAGS_ct_server);
   unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
@@ -962,6 +1056,8 @@ int main(int argc, char** argv) {
     ret = Upload();
   } else if (cmd == "audit") {
     ret = Audit();
+  } else if (cmd == "audit") {
+    ret = AuditDPF();
   } else if (cmd == "consistency") {
     ret = CheckConsistency();
   } else if (cmd == "certificate") {

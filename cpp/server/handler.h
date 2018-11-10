@@ -59,6 +59,9 @@ class HttpHandler {
 
   void GetEntries(evhttp_request* req) const;
   void GetProof(evhttp_request* req) const;
+
+  void GetProofDPF(evhttp_request* req) const;
+
   void GetSTH(evhttp_request* req) const;
   void GetConsistency(evhttp_request* req) const;
 

@@ -6,6 +6,8 @@
 #include "log/cert_submission_handler.h"
 #include "log/log_signer.h"
 #include "merkletree/merkle_verifier.h"
+#include "merkletree/merkle_tree_math.h"
+#include "dpf_pir/dpf.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/util.h"
@@ -112,6 +114,24 @@ LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProof(
   if (sig_verifier_->VerifySTHSignature(sth) != LogSigVerifier::OK)
     return INVALID_SIGNATURE;
   return VERIFY_OK;
+}
+
+void LogVerifier::GenDPF(std::vector<std::vector<uint8_t> >& DPF_keys_a, std::vector<std::vector<uint8_t> >& DPF_keys_b,
+                       size_t tree_size, size_t index) {
+
+  if (tree_size == 0)
+    return;
+
+  // Move up, recording the sibling of the current node at each level.
+  while (tree_size) {
+    size_t sibling = MerkleTreeMath::Sibling(index);
+    auto keys = DPF::Gen(sibling, tree_size);
+    DPF_keys_a.push_back(keys.first);
+    DPF_keys_b.push_back(keys.second);
+
+    index = MerkleTreeMath::Parent(index);
+    --tree_size;
+  }
 }
 
 LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProofDPF(

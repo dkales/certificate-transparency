@@ -32,6 +32,9 @@ class HTTPLogClient {
   util::StatusOr<ct::MerkleAuditProof> QueryAuditProof(
       const std::string& merkle_leaf_hash);
 
+  util::StatusOr<ct::MerkleAuditProof> QueryAuditProofDPF(
+            const std::vector<std::vector<uint8_t>>& dpf_keys);
+
   util::StatusOr<std::vector<std::string>> GetSTHConsistency(int64_t size1,
                                                              int64_t size2);
 

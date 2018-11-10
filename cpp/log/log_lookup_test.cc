@@ -248,7 +248,7 @@ TYPED_TEST(LogLookupTest, VerifyWithPathDPF) {
         //pack into generate functionality
         std::vector<std::vector<uint8_t>> key0;
         std::vector<std::vector<uint8_t>> key1;
-        lookup.GenDPF(key0, key1, 4, i);
+        this->verifier_.GenDPF(key0, key1, 4, i);
         EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key0, 16, &proof1));
         EXPECT_EQ(LogLookup::OK, lookup.AuditProofDPF(key1, 16, &proof2));
         proof1.set_leaf_index(i);
